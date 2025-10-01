@@ -1,12 +1,15 @@
 package main
 
 import (
+	"encoding/gob"
 	"encoding/json"
 	"flag"
 	"log"
 	"os"
 	"path/filepath"
 	"slices"
+
+	"github.com/klauspost/compress/zstd"
 )
 
 func main() {
@@ -193,5 +196,32 @@ func main() {
 	}
 
 	log.Printf("✓ Output successfully written to %s", outputFile.Name())
+
+	// Also write gob+zstd file of the JSON output
+	compressedFn := inputARTCC + "-videomaps-eram.json.gob.zst"
+	log.Printf("Writing compressed output to %s...", compressedFn)
+	f, err := os.Create(compressedFn)
+	if err != nil {
+		log.Fatalf("Error creating compressed file: %v", err)
+	}
+	defer f.Close()
+
+	enc, err := zstd.NewWriter(f)
+	if err != nil {
+		log.Fatalf("Error creating zstd writer: %v", err)
+	}
+	defer enc.Close()
+
+	// Encode JSON bytes inside gob for stability
+	jsonBytes, err := json.Marshal(output)
+	if err != nil {
+		log.Fatalf("Error marshaling output json: %v", err)
+	}
+
+	ge := gob.NewEncoder(enc)
+	if err := ge.Encode(jsonBytes); err != nil {
+		log.Fatalf("Error writing gob payload: %v", err)
+	}
+
 	log.Println("=== CRC ERAM Map Processor Complete ===")
 }
