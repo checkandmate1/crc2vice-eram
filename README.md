@@ -8,4 +8,4 @@ Place the executable in your CRC folder and run (shell dependant)
 ./crc2vice-eram.exe -artcc <ARTCC>
 ```
 
-A .json.gob.zst file should be made where the executable is
+A .gob file should be made where the executable is

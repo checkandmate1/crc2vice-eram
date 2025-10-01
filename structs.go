@@ -640,8 +640,8 @@ func (c *GeoJSONCoordinates) UnmarshalJSON(d []byte) error {
 }
 
 ///////////////////////////////////////////////////////////////////////////
+// Output structs
 
-// Note: this should match STARSMap in stars.go
 type ERAMMap struct {
 	BcgName    string
 	LabelLine1 string

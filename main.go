@@ -8,8 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-
-	"github.com/klauspost/compress/zstd"
 )
 
 func main() {
@@ -183,7 +181,7 @@ func main() {
 	log.Printf("Total maps processed: %d", totalMaps)
 	log.Printf("Total LineString features extracted: %d", totalLines)
 
-	outputFile, err := os.Create("output.json")
+	outputFile, err := os.Create(inputARTCC + "-eram-videomaps.json")
 	if err != nil {
 		log.Fatalf("Error creating output file: %v", err)
 	}
@@ -198,28 +196,16 @@ func main() {
 	log.Printf("✓ Output successfully written to %s", outputFile.Name())
 
 	// Also write gob+zstd file of the JSON output
-	compressedFn := inputARTCC + "-videomaps-eram.json.gob.zst"
-	log.Printf("Writing compressed output to %s...", compressedFn)
-	f, err := os.Create(compressedFn)
+	fn := inputARTCC + "-eram-videomaps.gob"
+	log.Printf("Writing compressed output to %s...", fn)
+	f, err := os.Create(fn)
 	if err != nil {
-		log.Fatalf("Error creating compressed file: %v", err)
+		log.Fatalf("Error creating file: %v", err)
 	}
 	defer f.Close()
 
-	enc, err := zstd.NewWriter(f)
-	if err != nil {
-		log.Fatalf("Error creating zstd writer: %v", err)
-	}
-	defer enc.Close()
-
-	// Encode JSON bytes inside gob for stability
-	jsonBytes, err := json.Marshal(output)
-	if err != nil {
-		log.Fatalf("Error marshaling output json: %v", err)
-	}
-
-	ge := gob.NewEncoder(enc)
-	if err := ge.Encode(jsonBytes); err != nil {
+	ge := gob.NewEncoder(f)
+	if err := ge.Encode(output); err != nil {
 		log.Fatalf("Error writing gob payload: %v", err)
 	}
 
