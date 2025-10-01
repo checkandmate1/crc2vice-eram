@@ -24,10 +24,10 @@ jobs:
 
     steps:
     - name: Checkout source
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Setup go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version-file: go.mod
 
@@ -37,7 +37,7 @@ jobs:
         ls
 
     - name: Save executable
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: crc2vice.exe
         path: crc2vice.exe
