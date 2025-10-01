@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 )
 
 func main() {
@@ -206,6 +207,41 @@ func main() {
 
 	ge := gob.NewEncoder(f)
 	if err := ge.Encode(output); err != nil {
+		log.Fatalf("Error writing gob payload: %v", err)
+	}
+
+	fn = strings.Replace(fn, "videomaps", "manifest", 1)
+	log.Printf("Writing manifest to %s...", fn)
+
+
+	f, err = os.Create(fn)
+	if err != nil {
+		log.Fatalf("Error creating file: %v", err)
+	}
+	defer f.Close()
+	
+	// Create output with only map names 
+	manifest := make(map[string][]string) // MapGroup -> []MapNames 
+	for groupName, group := range output {
+		for _, mapItem := range group.Maps {
+			manifest[groupName] = append(manifest[groupName], mapItem.LabelLine1 + " " + mapItem.LabelLine2)
+		}
+	}
+
+	fn = strings.Replace(fn, "gob", "json", 1)
+	jf, err := os.Create(fn)
+	if err != nil {
+		log.Fatalf("Error creating file: %v", err)
+	}
+	defer jf.Close()
+
+	je := json.NewEncoder(jf)
+	if err := je.Encode(manifest); err != nil {
+		log.Fatalf("Error writing json payload: %v", err)
+	}
+
+	ge = gob.NewEncoder(f)
+	if err := ge.Encode(manifest); err != nil {
 		log.Fatalf("Error writing gob payload: %v", err)
 	}
 
