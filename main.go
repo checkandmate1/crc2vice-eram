@@ -76,7 +76,7 @@ func main() {
 
 			for _, videoMapID := range geoMap.VideoMapIds {
 				// log.Printf("  Processing video map %d/%d: %s", i+1, len(geoMap.VideoMapIds), videoMapID)
-				file, err := os.Open("C:/Users/Michael/AppData/Local/CRC/VideoMaps/ZNY/" + videoMapID + ".geojson")
+				file, err := os.Open(currentDir + "/VideoMaps/" + inputARTCC + "/" + videoMapID + ".geojson")
 				if err != nil {
 					log.Fatalf("Error opening video map file %s: %v", videoMapID, err)
 				}
