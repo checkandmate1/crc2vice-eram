@@ -134,8 +134,8 @@ func main() {
 						eff.Thickness = lineDefaults.Thickness
 					}
 
-					// Filter membership: require this filter index
-					if !slices.Contains(eff.Filters, j) {
+					// Filter membership: CRC filters are 1-based; adjust for zero-based j
+					if !slices.Contains(eff.Filters, j+1) {
 						continue
 					}
 
