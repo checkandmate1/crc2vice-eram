@@ -162,6 +162,8 @@ func main() {
 			}
 
 		}
+		group.LabelLine1 = geoMap.LabelLine1
+		group.LabelLine2 = geoMap.LabelLine2
 		output[geoMap.Name] = group
 	}
 
@@ -220,11 +222,32 @@ func main() {
 	}
 	defer f.Close()
 	
+	combine := func(x, y string) string {
+		x = strings.TrimSpace(x)
+		y = strings.TrimSpace(y)
+
+		if x == "" {
+			return y
+		}
+		if y == "" {
+			return x
+		}
+
+		// add space unless x already ends with space OR y already starts with space
+		if strings.HasSuffix(x, " ") || strings.HasPrefix(y, " ") {
+			return x + y
+		}
+		return x + " " + y
+	}
+
 	// Create output with only map names 
-	manifest := make(map[string][]string) // MapGroup -> []MapNames 
+	manifest := make(map[string]interface{}) // MapGroup -> []MapNames 
 	for groupName, group := range output {
 		for _, mapItem := range group.Maps {
-			manifest[groupName] = append(manifest[groupName], mapItem.LabelLine1 + " " + mapItem.LabelLine2)
+			if _, ok := manifest[groupName]; !ok {
+				manifest[groupName] = []string{}
+			}
+			manifest[groupName] = append(manifest[groupName].([]string), combine(mapItem.LabelLine1, mapItem.LabelLine2))
 		}
 	}
 
