@@ -215,13 +215,12 @@ func main() {
 	fn = strings.Replace(fn, "videomaps", "manifest", 1)
 	log.Printf("Writing manifest to %s...", fn)
 
-
 	f, err = os.Create(fn)
 	if err != nil {
 		log.Fatalf("Error creating file: %v", err)
 	}
 	defer f.Close()
-	
+
 	combine := func(x, y string) string {
 		x = strings.TrimSpace(x)
 		y = strings.TrimSpace(y)
@@ -240,8 +239,8 @@ func main() {
 		return x + " " + y
 	}
 
-	// Create output with only map names 
-	manifest := make(map[string]interface{}) // MapGroup -> []MapNames 
+	// Create output with only map names
+	manifest := make(map[string]interface{}) // MapGroup -> []MapNames
 	for groupName, group := range output {
 		for _, mapItem := range group.Maps {
 			if _, ok := manifest[groupName]; !ok {
