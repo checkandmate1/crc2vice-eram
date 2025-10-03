@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -139,7 +140,17 @@ func main() {
 						continue
 					}
 
-					aggregatedLines = append(aggregatedLines, feature.Geometry.Coordinates)
+					// Append line(s), splitting into dash segments when style indicates dashed
+					switch normalizeStyle(eff.Style) {
+					case "shortdashed", "shortdash", "dashed":
+						segments := buildDashedSegments(feature.Geometry.Coordinates, 1.0/60.0, 1.0/60.0)
+						aggregatedLines = append(aggregatedLines, segments...)
+					case "longdashed", "longdash":
+						segments := buildDashedSegments(feature.Geometry.Coordinates, 2.0/60.0, 2.0/60.0)
+						aggregatedLines = append(aggregatedLines, segments...)
+					default:
+						aggregatedLines = append(aggregatedLines, feature.Geometry.Coordinates)
+					}
 
 					if eff.Bcg-1 >= 0 && eff.Bcg-1 < len(geoMap.BcgMenu) {
 						// Only use element BCG if no filter-index BCG was set
@@ -268,4 +279,109 @@ func main() {
 	}
 
 	log.Println("=== CRC ERAM Map Processor Complete ===")
+}
+
+func normalizeStyle(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	s = strings.ReplaceAll(s, " ", "")
+	s = strings.ReplaceAll(s, "_", "")
+	return s
+}
+
+func buildDashedSegments(coords []Point2LL, dashLenDeg float64, gapLenDeg float64) [][]Point2LL {
+	if len(coords) < 2 || dashLenDeg <= 0 || gapLenDeg < 0 {
+		return [][]Point2LL{coords}
+	}
+	var segments [][]Point2LL
+	// State
+	onDash := true
+	remaining := dashLenDeg
+	if !onDash {
+		remaining = gapLenDeg
+	}
+	// Current segment points when in dash phase
+	var cur []Point2LL
+
+	// Helper to emit and reset the current dash segment
+	emit := func() {
+		if len(cur) >= 2 {
+			// Copy to avoid aliasing
+			seg := make([]Point2LL, len(cur))
+			copy(seg, cur)
+			segments = append(segments, seg)
+		}
+		cur = cur[:0]
+	}
+
+	// Iterate over each segment of the input polyline
+	for i := 0; i < len(coords)-1; i++ {
+		x1 := float64(coords[i][1])
+		y1 := float64(coords[i][0])
+		x2 := float64(coords[i+1][1])
+		y2 := float64(coords[i+1][0])
+		dx := x2 - x1
+		dy := y2 - y1
+		segLen := math.Hypot(dx, dy)
+		if segLen == 0 {
+			continue
+		}
+		// Unit direction
+		ux := dx / segLen
+		uy := dy / segLen
+
+		// Current position along this segment
+		cx := x1
+		cy := y1
+
+		// For dash segments, start with the starting point
+		if onDash && len(cur) == 0 {
+			cur = append(cur, Point2LL{float32(y1), float32(x1)})
+		}
+
+		remainingInThis := remaining
+		traveled := 0.0
+		for traveled < segLen {
+			step := math.Min(remainingInThis, segLen-traveled)
+			// Advance by step
+			cx += ux * step
+			cy += uy * step
+			traveled += step
+
+			if onDash {
+				// Record the point in the dash
+				cur = append(cur, Point2LL{float32(cy), float32(cx)})
+			}
+
+			remainingInThis -= step
+			if remainingInThis <= 1e-9 {
+				// Toggle phase and reset remaining for next phase
+				onDash = !onDash
+				if onDash {
+					remainingInThis = dashLenDeg
+					// Start a new dash from current point
+					cur = append(cur, Point2LL{float32(cy), float32(cx)})
+				} else {
+					// Emit completed dash
+					emit()
+					remainingInThis = gapLenDeg
+				}
+			}
+		}
+
+		// Carry remaining into next input segment
+		remaining = remainingInThis
+		if onDash && len(cur) == 0 {
+			// Ensure continuity of dash across vertices
+			cur = append(cur, Point2LL{float32(cy), float32(cx)})
+		}
+	}
+
+	// If we ended while on a dash, emit it
+	if onDash {
+		emit()
+	}
+	if len(segments) == 0 {
+		return [][]Point2LL{coords}
+	}
+	return segments
 }
