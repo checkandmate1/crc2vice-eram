@@ -15,7 +15,7 @@ import (
 func main() {
 	log.Println("=== CRC ERAM Map Processor Starting ===")
 
-	var inputARTCC string = "ZNY"
+	var inputARTCC string 
 	flag.StringVar(&inputARTCC, "artcc", "", "ARTCC to get files for")
 	flag.Parse()
 
