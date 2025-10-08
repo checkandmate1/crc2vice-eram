@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -442,8 +444,8 @@ type ARTCC struct {
 					LabelLine1 string `json:"labelLine1"`
 					LabelLine2 string `json:"labelLine2"`
 				} `json:"filterMenu"`
-				BcgMenu     []string `json:"bcgMenu"`
-				VideoMapIds []string `json:"videoMapIds"`
+				BcgMenu     []StringOrInt `json:"bcgMenu"`
+				VideoMapIds []string      `json:"videoMapIds"`
 			} `json:"geoMaps"`
 			EmergencyChecklist      []string `json:"emergencyChecklist"`
 			PositionReliefChecklist []string `json:"positionReliefChecklist"`
@@ -569,6 +571,34 @@ type ARTCC struct {
 
 type Point2LL [2]float32
 
+// StringOrInt is a helper type for fields that may be numeric or a numeric string in JSON.
+type StringOrInt int
+
+func (s *StringOrInt) UnmarshalJSON(b []byte) error {
+	// Try number first
+	var n int
+	if err := json.Unmarshal(b, &n); err == nil {
+		*s = StringOrInt(n)
+		return nil
+	}
+	// Then string containing a number
+	var str string
+	if err := json.Unmarshal(b, &str); err == nil {
+		str = strings.TrimSpace(str)
+		if str == "" {
+			*s = 0
+			return nil
+		}
+		if v, err := strconv.Atoi(str); err == nil {
+			*s = StringOrInt(v)
+			return nil
+		}
+	}
+	// Fallback: leave zero
+	*s = 0
+	return nil
+}
+
 type GeoMap struct {
 	Type     string `json:"type"`
 	Features []struct {
@@ -621,6 +651,112 @@ type GeoJSONProperties struct {
 	Opaque    bool `json:"opaque"`
 	XOffset   int  `json:"xOffset"`
 	YOffset   int  `json:"yOffset"`
+}
+
+// UnmarshalJSON allows numeric fields to be provided as either numbers or numeric strings.
+func (p *GeoJSONProperties) UnmarshalJSON(data []byte) error {
+	type rawMap map[string]json.RawMessage
+	var raw rawMap
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	// Helper to decode bool fields (ignore errors, leave zero-value on failure)
+	decodeBool := func(key string, dst *bool) {
+		if b, ok := raw[key]; ok {
+			_ = json.Unmarshal(b, dst)
+		}
+	}
+
+	// Helper to decode string fields
+	decodeString := func(key string, dst *string) {
+		if b, ok := raw[key]; ok {
+			_ = json.Unmarshal(b, dst)
+		}
+	}
+
+	// Helper to decode an int that may be a JSON number or a quoted numeric string
+	decodeInt := func(key string, dst *int) {
+		b, ok := raw[key]
+		if !ok {
+			return
+		}
+		var n int
+		if err := json.Unmarshal(b, &n); err == nil {
+			*dst = n
+			return
+		}
+		var s string
+		if err := json.Unmarshal(b, &s); err == nil {
+			s = strings.TrimSpace(s)
+			if s == "" {
+				return
+			}
+			if i, err := strconv.Atoi(s); err == nil {
+				*dst = i
+			}
+		}
+	}
+
+	// Helper to decode []int which may be an array of numbers or strings, or a single number/string
+	decodeIntSlice := func(key string, dst *[]int) {
+		b, ok := raw[key]
+		if !ok {
+			return
+		}
+		var ints []int
+		if err := json.Unmarshal(b, &ints); err == nil {
+			*dst = ints
+			return
+		}
+		var strs []string
+		if err := json.Unmarshal(b, &strs); err == nil {
+			out := make([]int, 0, len(strs))
+			for _, s := range strs {
+				s = strings.TrimSpace(s)
+				if s == "" {
+					continue
+				}
+				if i, err := strconv.Atoi(s); err == nil {
+					out = append(out, i)
+				}
+			}
+			*dst = out
+			return
+		}
+		// Try single value
+		var single int
+		if err := json.Unmarshal(b, &single); err == nil {
+			*dst = []int{single}
+			return
+		}
+		var singleStr string
+		if err := json.Unmarshal(b, &singleStr); err == nil {
+			if i, err := strconv.Atoi(strings.TrimSpace(singleStr)); err == nil {
+				*dst = []int{i}
+			}
+		}
+	}
+
+	// Booleans
+	decodeBool("isLineDefaults", &p.IsLineDefaults)
+	decodeBool("isTextDefaults", &p.IsTextDefaults)
+	decodeBool("isSymbolDefaults", &p.IsSymbolDefaults)
+
+	// Common / line properties
+	decodeInt("bcg", &p.Bcg)
+	decodeIntSlice("filters", &p.Filters)
+	decodeString("style", &p.Style)
+	decodeInt("thickness", &p.Thickness)
+
+	// Text properties
+	decodeInt("size", &p.Size)
+	decodeBool("underline", &p.Underline)
+	decodeBool("opaque", &p.Opaque)
+	decodeInt("xOffset", &p.XOffset)
+	decodeInt("yOffset", &p.YOffset)
+
+	return nil
 }
 
 // We only extract lines (at the moment at least) and so we only worry
